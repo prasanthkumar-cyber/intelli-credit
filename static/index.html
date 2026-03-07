@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intelli-Credit | AI-Powered Credit Decisioning</title>
+    <meta name="description" content="Next-Gen Corporate Credit Appraisal with XGBoost ML and SHAP Explainability">
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <!-- ═══ Toast Container ═══ -->
+    <div id="toast-container"></div>
+
+    <!-- ═══ Loading Overlay ═══ -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+        <p id="loading-text">Processing...</p>
+        <div class="loading-progress-container">
+            <div id="loading-progress-bar" class="loading-progress-bar"></div>
+        </div>
+    </div>
+
+    <!-- ═══ Navigation ═══ -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="brand-icon">&#127974;</span>
+            <span class="brand-title">Intelli-Credit</span>
+            <span class="badge-ai">AI Engine</span>
+        </div>
+        <div class="nav-links">
+            <a href="#" class="nav-link active" data-view="dashboard">Dashboard</a>
+            <a href="#" class="nav-link" data-view="ingestor">Data Ingestor</a>
+            <a href="#" class="nav-link" data-view="research">Research Agent</a>
+            <a href="#" class="nav-link" data-view="notes">Officer Notes</a>
+            <a href="#" class="nav-link" data-view="analysis">Analysis</a>
+            <a href="#" class="nav-link" data-view="compare">Compare</a>
+        </div>
+        <div class="nav-status">
+            <span class="status-dot" id="status-dot"></span>
+            <span id="status-text">Checking...</span>
+        </div>
+    </nav>
+
+    <!-- ═══ DASHBOARD VIEW ═══ -->
+    <main id="view-dashboard" class="view active">
+        <div class="view-header" style="display: flex; justify-content: space-between; align-items:flex-start;">
+            <div>
+                <h1>Credit Appraisal Dashboard</h1>
+                <p class="subtitle">AI-powered credit decisioning with XGBoost ML &amp; SHAP explainability</p>
+            </div>
+            <div>
+                <button id="btn-rerun-analysis" class="btn btn-outline hidden"
+                    style="border-color: var(--accent); color: var(--accent);">&#129504; Re-run Analysis</button>
+            </div>
+        </div>
+
+        <!-- Entity Search with Autocomplete -->
+        <div class="search-container">
+            <div class="search-wrapper">
+                <input type="text" id="entity-search" placeholder="Search Entity ID or Company Name..."
+                    autocomplete="off" oninput="handleSearchInput(this.value)">
+                <div id="search-suggestions" class="search-suggestions hidden"></div>
+            </div>
+            <button class="btn btn-primary" onclick="loadCompany()">Load</button>
+            <button class="btn btn-outline" onclick="seedDemo()">Seed Demo Data</button>
+        </div>
+
+        <!-- Workflow Progress Bar -->
+        <div id="progress-bar-container" class="progress-container hidden">
+            <div class="progress-steps">
+                <div class="progress-step" id="step-data"><span class="step-icon">1</span><span class="step-label">Data
+                        Ingested</span></div>
+                <div class="progress-step" id="step-gst"><span class="step-icon">2</span><span class="step-label">GST /
+                        CIBIL</span></div>
+                <div class="progress-step" id="step-research"><span class="step-icon">3</span><span
+                        class="step-label">Research</span></div>
+                <div class="progress-step" id="step-notes"><span class="step-icon">4</span><span
+                        class="step-label">Notes</span></div>
+                <div class="progress-step" id="step-analyzed"><span class="step-icon">5</span><span
+                        class="step-label">Analyzed</span></div>
+                <div class="progress-step" id="step-report"><span class="step-icon">6</span><span
+                        class="step-label">Report Ready</span></div>
+            </div>
+            <div class="progress-track">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+        </div>
+
+        <!-- Decision Banner -->
+        <div id="decision-banner" class="decision-banner hidden"></div>
+
+        <!-- Dashboard Grid -->
+        <div id="dashboard-content" class="dashboard-grid hidden">
+            <!-- Company Info Card -->
+            <div class="card span-2" id="company-info-card">
+                <h3>Company Overview</h3>
+                <div id="company-info"></div>
+            </div>
+
+            <!-- Five Cs Radar Chart -->
+            <div class="card" id="five-cs-card">
+                <h3>Five Cs Assessment</h3>
+                <div class="chart-container">
+                    <canvas id="fivecs-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- SHAP Waterfall Chart -->
+            <div class="card" id="shap-card">
+                <h3>SHAP Feature Contributions</h3>
+                <div class="chart-container">
+                    <canvas id="shap-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Risk Flags -->
+            <div class="card" id="flags-card">
+                <h3>Risk Flags</h3>
+                <div id="flags-container"></div>
+            </div>
+
+            <!-- Decision Reasons -->
+            <div class="card" id="reasons-card">
+                <h3>Decision Rationale</h3>
+                <div id="reasons-container"></div>
+            </div>
+
+            <!-- GSTR Discrepancy Alert -->
+            <div class="card hidden" id="gstr-alert-card">
+                <h3>GST Discrepancy Alert</h3>
+                <div id="gstr-alert-content"></div>
+            </div>
+
+            <!-- Actions -->
+            <div class="card" id="actions-card">
+                <h3>Actions</h3>
+                <div class="action-buttons">
+                    <button class="btn btn-primary btn-full" onclick="downloadCAM()">Download CAM Report
+                        (.docx)</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ═══ DATA INGESTOR VIEW ═══ -->
+    <main id="view-ingestor" class="view">
+        <div class="view-header">
+            <h1><span class="icon">&#128196;</span> Data Ingestor</h1>
+            <p class="subtitle">Upload documents or enter financial data manually</p>
+        </div>
+
+        <!-- Sub-tabs -->
+        <div class="tab-bar">
+            <button class="tab active" onclick="switchIngestTab('upload')">Document Upload</button>
+            <button class="tab" onclick="switchIngestTab('manual')">Manual Entry</button>
+            <button class="tab" onclick="switchIngestTab('batch')">Batch CSV Upload</button>
+        </div>
+
+        <!-- Upload Tab -->
+        <div id="ingest-upload" class="tab-content active">
+            <div class="card">
+                <h3>Upload Financial Document</h3>
+                <form id="upload-form" onsubmit="event.preventDefault(); uploadDocument()">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>ENTITY ID</label>
+                            <input type="text" id="upload-entity-id" placeholder="e.g. CORP_001" required>
+                        </div>
+                        <div class="form-group">
+                            <label>COMPANY NAME</label>
+                            <input type="text" id="upload-company-name" placeholder="e.g. Acme Industries Ltd.">
+                        </div>
+                        <div class="form-group">
+                            <label>DOCUMENT TYPE</label>
+                            <select id="upload-doc-type">
+                                <option value="GST">GST Filing (GSTR-2A/3B)</option>
+                                <option value="BankStatement">Bank Statement</option>
+                                <option value="AnnualReport">Annual Report</option>
+                                <option value="CIBIL">CIBIL Report</option>
+                                <option value="LegalNotice">Legal Notice</option>
+                                <option value="SanctionLetter">Sanction Letter</option>
+                                <option value="BalanceSheet">Balance Sheet</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>REQUESTED LOAN AMOUNT (&#8377;)</label>
+                            <input type="number" id="upload-loan-amount" placeholder="e.g. 50000000">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>SELECT PDF DOCUMENT</label>
+                        <div class="file-drop" id="file-drop-zone">
+                            <input type="file" id="upload-file" accept=".pdf" hidden>
+                            <span class="drop-icon">&#128206;</span> Drag &amp; drop or click to select
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">&#11014; Upload &amp; Parse</button>
+                </form>
+                <div id="upload-result"></div>
+            </div>
+        </div>
+
+        <!-- Manual Entry Tab -->
+        <div id="ingest-manual" class="tab-content">
+            <div class="card">
+                <h3>Manual Financial Data Entry</h3>
+                <form id="manual-form" onsubmit="event.preventDefault(); submitManualEntry()">
+                    <div class="form-group">
+                        <label>ENTITY ID</label>
+                        <input type="text" id="manual-entity-id" placeholder="e.g. CORP_001"
+                            oninput="autoPopulateEntity(this.value)">
+                        <small class="hint" id="manual-entity-hint"></small>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group"><label>COMPANY NAME</label>
+                            <input type="text" id="manual-company-name" placeholder="e.g. Acme Industries Ltd.">
+                        </div>
+                        <div class="form-group"><label>REVENUE (&#8377;)</label>
+                            <input type="number" id="manual-revenue" placeholder="Annual Revenue"
+                                oninput="computeLiveRatios()">
+                        </div>
+                        <div class="form-group"><label>EBITDA (&#8377;)</label>
+                            <input type="number" id="manual-ebitda" placeholder="EBITDA">
+                        </div>
+                        <div class="form-group"><label>NET PROFIT (&#8377;)</label>
+                            <input type="number" id="manual-net-profit" placeholder="Net Profit">
+                        </div>
+                        <div class="form-group"><label>TOTAL DEBT (&#8377;)</label>
+                            <input type="number" id="manual-total-debt" placeholder="Total Debt"
+                                oninput="computeLiveRatios()">
+                        </div>
+                        <div class="form-group"><label>TOTAL ASSETS (&#8377;)</label>
+                            <input type="number" id="manual-total-assets" placeholder="Total Assets">
+                        </div>
+                        <div class="form-group"><label>NET WORTH (&#8377;)</label>
+                            <input type="number" id="manual-net-worth" placeholder="Net Worth / Equity"
+                                oninput="computeLiveRatios()">
+                        </div>
+                        <div class="form-group"><label>CURRENT ASSETS (&#8377;)</label>
+                            <input type="number" id="manual-current-assets" placeholder="Current Assets"
+                                oninput="computeLiveRatios()">
+                        </div>
+                        <div class="form-group"><label>CURRENT LIABILITIES (&#8377;)</label>
+                            <input type="number" id="manual-current-liabilities" placeholder="Current Liabilities"
+                                oninput="computeLiveRatios()">
+                        </div>
+                        <div class="form-group"><label>COLLATERAL VALUE (&#8377;)</label>
+                            <input type="number" id="manual-collateral-value" placeholder="Collateral Value">
+                        </div>
+                        <div class="form-group"><label>INTEREST EXPENSE (&#8377;)</label>
+                            <input type="number" id="manual-interest-expense" placeholder="Interest Expense"
+                                oninput="computeLiveRatios()">
+                        </div>
+                        <div class="form-group"><label>OPERATING MARGIN (%)</label>
+                            <input type="number" id="manual-operating-margin" placeholder="Operating Margin %">
+                        </div>
+                        <div class="form-group"><label>REVENUE GROWTH YoY (%)</label>
+                            <input type="number" id="manual-revenue-growth" placeholder="YoY Revenue Growth %">
+                        </div>
+                        <div class="form-group"><label>REQUESTED LOAN (&#8377;)</label>
+                            <input type="number" id="manual-requested-loan" placeholder="Loan Amount Requested">
+                        </div>
+                    </div>
+                    <!-- Live Ratio Display -->
+                    <div id="live-ratios" class="ratios-display hidden">
+                        <div class="ratio-chip" id="ratio-de"><span class="ratio-label">D/E Ratio</span><span
+                                class="ratio-value">--</span></div>
+                        <div class="ratio-chip" id="ratio-cr"><span class="ratio-label">Current Ratio</span><span
+                                class="ratio-value">--</span></div>
+                        <div class="ratio-chip" id="ratio-dscr"><span class="ratio-label">DSCR</span><span
+                                class="ratio-value">--</span></div>
+                        <div class="ratio-chip" id="ratio-icr"><span class="ratio-label">Interest Coverage</span><span
+                                class="ratio-value">--</span></div>
+                    </div>
+
+                    <h4 class="section-divider">GST Data</h4>
+                    <div class="form-grid">
+                        <div class="form-group"><label>GSTR-3B TURNOVER (&#8377;)</label>
+                            <input type="number" id="manual-gstr3b" placeholder="GSTR-3B Turnover"
+                                oninput="checkGSTRDiscrepancy()">
+                        </div>
+                        <div class="form-group"><label>GSTR-2A TURNOVER (&#8377;)</label>
+                            <input type="number" id="manual-gstr2a" placeholder="GSTR-2A Turnover"
+                                oninput="checkGSTRDiscrepancy()">
+                        </div>
+                    </div>
+                    <!-- GSTR Discrepancy Inline Alert -->
+                    <div id="gstr-inline-alert" class="alert-box hidden"></div>
+
+                    <h4 class="section-divider">CIBIL Data</h4>
+                    <div class="form-grid">
+                        <div class="form-group"><label>CIBIL SCORE</label>
+                            <input type="number" id="manual-cibil-score" placeholder="300-900"
+                                oninput="onCibilScoreChange()">
+                        </div>
+                        <div class="form-group"><label>OVERDUE ACCOUNTS</label>
+                            <input type="number" id="manual-overdue" placeholder="Number of overdue accounts">
+                        </div>
+                        <div class="form-group"><label>SUIT FILED ACCOUNTS</label>
+                            <input type="number" id="manual-suit-filed" placeholder="Suit filed count">
+                        </div>
+                        <div class="form-group"><label>DPD 90+ ACCOUNTS</label>
+                            <input type="number" id="manual-dpd90" placeholder="DPD 90+ days count">
+                        </div>
+                        <div class="form-group"><label>CREDIT UTILIZATION (%)</label>
+                            <input type="number" id="manual-credit-util" placeholder="0-100">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">Submit &amp; Analyze</button>
+                </form>
+                <div id="manual-result"></div>
+            </div>
+        </div>
+
+        <!-- Batch CSV Tab -->
+        <div id="ingest-batch" class="tab-content">
+            <div class="card">
+                <h3>Batch CSV Upload</h3>
+                <p class="subtitle">Upload a CSV file with multiple entities for bulk credit assessment.</p>
+                <div class="csv-template">
+                    <strong>Required CSV columns:</strong>
+                    <code>entity_id, company_name, revenue, ebitda, net_profit, total_debt, total_assets, net_worth,
+                    current_assets, current_liabilities, collateral_value, interest_expense, operating_margin,
+                    revenue_growth_yoy, gstr_3b_turnover, gstr_2a_turnover, cibil_score, overdue_accounts,
+                    suit_filed_accounts, dpd_90_plus, credit_utilization_pct, requested_loan_amount</code>
+                    <button class="btn btn-outline btn-sm" onclick="downloadCSVTemplate()"
+                        style="margin-top:0.75rem;">&#11015; Download CSV Template</button>
+                </div>
+                <form id="batch-form" onsubmit="event.preventDefault(); uploadBatchCSV()">
+                    <div class="form-group">
+                        <label>SELECT CSV FILE</label>
+                        <div class="file-drop" id="csv-drop-zone">
+                            <input type="file" id="batch-file" accept=".csv" hidden>
+                            <span class="drop-icon">&#128206;</span> Drag &amp; drop CSV or click to select
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">Upload &amp; Process Batch</button>
+                </form>
+                <div id="batch-result"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ═══ RESEARCH VIEW ═══ -->
+    <main id="view-research" class="view">
+        <div class="view-header">
+            <h1><span class="icon">&#128270;</span> Research Agent</h1>
+            <p class="subtitle">Automated web research and market intelligence</p>
+        </div>
+        <div class="card">
+            <h3>Run Company Research</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>ENTITY ID</label>
+                    <input type="text" id="research-entity-id" placeholder="CORP_001">
+                </div>
+                <div class="form-group">
+                    <label>COMPANY NAME</label>
+                    <input type="text" id="research-company-name" placeholder="Company to research">
+                </div>
+                <div class="form-group span-2">
+                    <label>PROMOTERS (comma-separated)</label>
+                    <input type="text" id="research-promoters" placeholder="e.g. Ravi Sharma, Neha Patel">
+                </div>
+            </div>
+            <button class="btn btn-primary btn-full" onclick="runResearch()">&#128270; Run Web Research</button>
+        </div>
+        <div id="research-results"></div>
+    </main>
+
+    <!-- ═══ OFFICER NOTES VIEW ═══ -->
+    <main id="view-notes" class="view">
+        <div class="view-header">
+            <h1><span class="icon">&#128221;</span> Credit Officer Notes</h1>
+            <p class="subtitle">Add qualitative observations from site visits and interviews</p>
+        </div>
+        <div class="card">
+            <h3>Add New Note</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>ENTITY ID</label>
+                    <input type="text" id="note-entity-id" placeholder="CORP_001"
+                        oninput="loadNotesHistory(this.value)">
+                </div>
+                <div class="form-group">
+                    <label>OFFICER NAME</label>
+                    <input type="text" id="note-officer-name" placeholder="Your name">
+                </div>
+                <div class="form-group">
+                    <label>CATEGORY</label>
+                    <select id="note-category">
+                        <option value="">Auto-detect</option>
+                        <option value="Character">Character</option>
+                        <option value="Capacity">Capacity</option>
+                        <option value="Capital">Capital</option>
+                        <option value="Collateral">Collateral</option>
+                        <option value="Conditions">Conditions</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>NOTE</label>
+                <textarea id="note-text" rows="5"
+                    placeholder="Describe your observations from the site visit, management interview, or due diligence..."
+                    oninput="debounceNotePreview()"></textarea>
+                <div id="note-preview-container" class="preview-container hidden"
+                    style="margin-top: 0.5rem; font-size: 0.85rem;">
+                    <span style="color: var(--text-muted)">Detected Category:</span>
+                    <span id="note-preview-category" class="badge-blue"
+                        style="margin-left: 0.5rem; padding: 0.15rem 0.5rem; border-radius: 4px;">None</span>
+                    <span style="color: var(--text-muted); margin-left: 1rem;">Detected Severity:</span>
+                    <span id="note-preview-severity" style="margin-left: 0.5rem; font-weight: 600;">None</span>
+                </div>
+            </div>
+            <button class="btn btn-primary btn-full" onclick="addNote()">&#128221; Submit Note</button>
+        </div>
+
+        <!-- Notes History -->
+        <div class="card" id="notes-history-card">
+            <h3>Notes History</h3>
+            <div id="notes-history">
+                <p class="empty-state">Enter an Entity ID above to see note history.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- ═══ ANALYSIS VIEW ═══ -->
+    <main id="view-analysis" class="view">
+        <div class="view-header">
+            <h1><span class="icon">&#9889;</span> Credit Analysis Engine</h1>
+            <p class="subtitle">XGBoost ML scoring with SHAP explainability</p>
+        </div>
+        <div class="card">
+            <h3>Run Full Analysis</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>ENTITY ID</label>
+                    <input type="text" id="analysis-entity-id" placeholder="CORP_001" oninput="onAnalysisEntityInput()">
+                </div>
+                <div class="form-group" style="display:flex; align-items:flex-end; gap:0.5rem;">
+                    <button class="btn btn-primary btn-full" onclick="runAnalysis()">&#129504; Run XGBoost
+                        Analysis</button>
+                </div>
+            </div>
+        </div>
+        <div id="analysis-result"></div>
+    </main>
+
+    <!-- ═══ COMPARE ENTITIES VIEW ═══ -->
+    <main id="view-compare" class="view">
+        <div class="view-header">
+            <h1><span class="icon">&#128269;</span> Compare Entities</h1>
+            <p class="subtitle">Side-by-side analysis of key financial and risk metrics</p>
+        </div>
+        <div class="card">
+            <div class="form-grid" style="grid-template-columns: 1fr 1fr auto; align-items: end;">
+                <div class="form-group">
+                    <label>ENTITY A ID</label>
+                    <input type="text" id="compare-entity-a" placeholder="e.g. CORP_001">
+                </div>
+                <div class="form-group">
+                    <label>ENTITY B ID</label>
+                    <input type="text" id="compare-entity-b" placeholder="e.g. CORP_002">
+                </div>
+                <button class="btn btn-primary" onclick="runComparison()">Compare</button>
+            </div>
+        </div>
+
+        <div id="compare-results" class="hidden" style="margin-top: 2rem;">
+            <!-- Comparison Table Rendered Here -->
+        </div>
+    </main>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>
