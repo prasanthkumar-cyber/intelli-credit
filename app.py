@@ -1,5 +1,5 @@
 """
-Intelli-Credit: FastAPI Application
+Intelli-Credit: FastAPI Application that implements a credit decisioning engine.
 Main web server with all API routes for the credit decisioning engine.
 """
 import os
