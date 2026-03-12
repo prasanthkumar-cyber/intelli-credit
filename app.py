@@ -124,6 +124,25 @@ def _dedup_flags(flags):
             unique.append(f)
     return unique
 
+def _get_latest_financials(financials_list):
+    """BUG 4 FIX: Return only the first (most recent) financial record,
+    preventing duplicate entries with conflicting data (e.g. different EBITDA)."""
+    if not financials_list:
+        return []
+    return [financials_list[0]]
+
+def _enrich_with_dscr(financials_list):
+    """BUG 5 FIX: Compute and inject DSCR into each financial record
+    so the Compare view can render it instead of showing '--'."""
+    for fin in financials_list:
+        if 'dscr' not in fin or fin['dscr'] is None:
+            ebitda = float(fin.get('ebitda', 0))
+            interest = float(fin.get('interest_expense', 0))
+            debt = float(fin.get('total_debt', 0))
+            denom = interest + debt * 0.1
+            fin['dscr'] = round(ebitda / denom, 2) if denom > 0 else 0
+    return financials_list
+
 def _safe_enum_str(val):
     """Extract string from a value that might be an Enum or already a string."""
     if hasattr(val, 'value'):
@@ -330,6 +349,7 @@ async def get_company(entity_id: str):
     try:
         financials = _try_db(db.get_financials, entity_id,
                              fallback=lambda: _mem_store["financials"].get(entity_id, []))
+        financials = _enrich_with_dscr(_get_latest_financials(financials))  # BUG 4+5
         gst_data = _try_db(db.get_gst_analysis, entity_id,
                            fallback=lambda: _mem_store["gst"].get(entity_id, []))
         cibil_data = _try_db(db.get_cibil, entity_id,
@@ -343,8 +363,7 @@ async def get_company(entity_id: str):
         decision = _try_db(db.get_decision, entity_id,
                            fallback=lambda: _mem_store["decisions"].get(entity_id))
 
-        # BUG 2: Deduplicate flags
-        # BUG 3: Filter out Web Research flags from risk flags panel
+        # Deduplicate flags, filter out Web Research flags from risk flags panel
         clean_flags = _dedup_flags(raw_flags or [])
         clean_flags = [f for f in clean_flags
                        if f.get('source_type') != 'Research'
@@ -365,16 +384,15 @@ async def get_company(entity_id: str):
 
 @app.get("/api/company/summary/{entity_id}")
 async def get_company_summary(entity_id: str):
-    """Get lightweight company profile for fast dashboard loading."""
+    """Get lightweight company profile for fast dashboard loading from memory cache."""
     try:
-        financials = _try_db(db.get_financials, entity_id,
-                             fallback=lambda: _mem_store["financials"].get(entity_id, []))
-        gst_data = _try_db(db.get_gst_analysis, entity_id,
-                           fallback=lambda: _mem_store["gst"].get(entity_id, []))
-        cibil_data = _try_db(db.get_cibil, entity_id,
-                             fallback=lambda: _mem_store["cibil"].get(entity_id))
-        decision = _try_db(db.get_decision, entity_id,
-                           fallback=lambda: _mem_store["decisions"].get(entity_id))
+        # SUPER FAST LOAD: Read directly from memory cache instead of hitting SQLite/Databricks disk sequentially
+        financials = _mem_store["financials"].get(entity_id, [])
+        financials = _enrich_with_dscr(_get_latest_financials(financials))  # BUG 4+5
+        
+        gst_data = _mem_store["gst"].get(entity_id, [])
+        cibil_data = _mem_store["cibil"].get(entity_id)
+        decision = _mem_store["decisions"].get(entity_id)
 
         return {
             "entity_id": entity_id,
@@ -535,6 +553,19 @@ async def analyze_and_decide(entity_id: str):
         research_flags = _mem_store.get("research_flags", {}).get(entity_id, [])
 
         features = analyzer.compute_feature_inputs(fin, gst_dict, cibil_data, all_flags)
+
+        # BUG 3 FIX: Inject research sentiment counts from _mem_store
+        # so the rationale generator sees real counts instead of 0
+        research_findings = _mem_store.get("research", {}).get(entity_id, [])
+        if research_findings:
+            features["negative_news_count"] = sum(
+                1 for r in research_findings
+                if isinstance(r, dict) and r.get("sentiment") == "negative"
+            )
+            features["positive_news_count"] = sum(
+                1 for r in research_findings
+                if isinstance(r, dict) and r.get("sentiment") == "positive"
+            )
 
         if notes:
             features["officer_severity_score"] = insight_mgr.compute_severity_score(notes)

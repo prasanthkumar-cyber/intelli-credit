@@ -4,7 +4,17 @@
    ═══════════════════════════════════════════════════════════ */
 
 // ─── Navigation ────────────────────────────────────────
-document.querySelectorAll('.nav-link').forEach(link => {
+// Sidebar icon buttons
+document.querySelectorAll('.sidebar-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const view = btn.dataset.view;
+        openTab(view);
+    });
+});
+
+// Header tab links
+document.querySelectorAll('.tab-link').forEach(link => {
     link.addEventListener('click', (e) => {
         e.preventDefault();
         const view = link.dataset.view;
@@ -14,8 +24,17 @@ document.querySelectorAll('.nav-link').forEach(link => {
 
 // ═══ TAB NAVIGATION ════════════════════════════════════
 function openTab(viewId) {
-    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-    document.querySelector(`[data-view="${viewId}"]`).classList.add('active');
+    // Sync sidebar buttons
+    document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
+    const sidebarBtn = document.querySelector(`.sidebar-btn[data-view="${viewId}"]`);
+    if (sidebarBtn) sidebarBtn.classList.add('active');
+
+    // Sync header tab links
+    document.querySelectorAll('.tab-link').forEach(l => l.classList.remove('active'));
+    const tabLink = document.querySelector(`.tab-link[data-view="${viewId}"]`);
+    if (tabLink) tabLink.classList.add('active');
+
+    // Switch views
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById(`view-${viewId}`).classList.add('active');
 
@@ -192,9 +211,14 @@ async function loadCompany() {
     currentEntityId = id;
     showLoading('Loading company data...');
 
+    // BUG 1 FIX: 10-second timeout so spinner never hangs forever
+    const loadController = new AbortController();
+    const loadTimeout = setTimeout(() => loadController.abort(), 10000);
+
     try {
         // PERFORMANCE BOOST: Fetch lightweight summary first for instant UI
-        const res = await fetch(`/api/company/summary/${id}`);
+        const res = await fetch(`/api/company/summary/${id}`, { signal: loadController.signal });
+        clearTimeout(loadTimeout);
         if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
         const summaryData = await res.json();
         hideLoading();
@@ -224,8 +248,12 @@ async function loadCompany() {
         fetchRiskFlags(id);
 
     } catch (e) {
+        clearTimeout(loadTimeout);
         hideLoading();
-        showToast('Failed to load: ' + e.message, 'error');
+        const msg = e.name === 'AbortError'
+            ? 'Request timed out — server may be busy. Please try again.'
+            : 'Failed to load: ' + e.message;
+        showToast(msg, 'error');
     } finally {
         isLoadingData = false;
     }
@@ -1312,6 +1340,7 @@ function renderComparisonTable(dataA, dataB) {
     const decB = dataB.decision || {};
 
     container.innerHTML = `
+        <div class="compare-table-wrapper">
         <table class="data-table" style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
             <thead>
                 <tr style="background: rgba(255,255,255,0.05);">
@@ -1362,6 +1391,7 @@ function renderComparisonTable(dataA, dataB) {
                 </tr>
             </tbody>
         </table>
+        </div>
     `;
     container.classList.remove('hidden');
 }

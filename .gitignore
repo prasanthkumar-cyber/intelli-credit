@@ -1,0 +1,27 @@
+# Environments
+venv/
+env/
+.env
+
+# Python Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Databases
+*.db
+*.sqlite3
+
+# Hackathon / API Keys
+.env.local
+config.local.py
+secret_keys/
+
+# Model Output / Uploads (Optional: so you don't push massive PDFs)
+uploads/
+reports/
+
+# IDEs
+.vscode/
+.idea/
+*.swp

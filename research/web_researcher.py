@@ -144,50 +144,59 @@ class WebResearcher:
 
     def _search_simulated(self, query: str, entity_id: str,
                           category: str) -> List[ResearchFinding]:
-        """Simulated research for demo when SerpAPI is unavailable."""
+        """Simulated research for demo when SerpAPI is unavailable.
+        BUG 2 FIX: Generates company-specific mock articles instead of
+        returning identical generic content for every entity.
+        """
+        # Extract company name from the quoted query string
+        company_name = entity_id  # fallback
+        match = re.search(r'"([^"]+)"', query)
+        if match:
+            company_name = match.group(1)
+
         simulated_results = {
             "company_news": [
                 {
-                    "title": "Company reports steady growth in Q3 FY24",
-                    "snippet": "The company reported a 12% increase in revenue driven by strong domestic demand and expansion into new markets.",
+                    "title": f"{company_name} reports steady growth in Q3 FY24",
+                    "snippet": f"{company_name} reported a 12% increase in revenue driven by strong domestic demand and expansion into new markets.",
                     "source": "https://economictimes.com/news",
                     "sentiment": "positive"
                 },
                 {
-                    "title": "Sector faces headwinds from new RBI regulations",
-                    "snippet": "New RBI guidelines on NBFC lending may impact growth trajectory for mid-sized corporates in the sector.",
+                    "title": f"Sector outlook for {company_name} faces headwinds from new RBI regulations",
+                    "snippet": f"New RBI guidelines on NBFC lending may impact growth trajectory for {company_name} and similar mid-sized corporates.",
                     "source": "https://livemint.com/industry",
                     "sentiment": "negative"
                 }
             ],
             "litigation": [
                 {
-                    "title": "Pending case in NCLT Mumbai",
-                    "snippet": "A commercial dispute with a supplier is pending before NCLT Mumbai bench. The claim amount is under ₹5 Cr.",
+                    "title": f"{company_name} — pending case in NCLT Mumbai",
+                    "snippet": f"A commercial dispute involving {company_name} with a supplier is pending before NCLT Mumbai bench. The claim amount is under ₹5 Cr.",
                     "source": "https://ecourts.gov.in",
                     "sentiment": "negative"
                 }
             ],
             "promoter": [
                 {
-                    "title": "Promoter has 15+ years industry experience",
-                    "snippet": "The managing director has been with the company since inception and holds multiple industry awards for excellence.",
+                    "title": f"{company_name} promoter has 15+ years industry experience",
+                    "snippet": f"The managing director of {company_name} has been with the company since inception and holds multiple industry awards for excellence.",
                     "source": "https://linkedin.com",
                     "sentiment": "positive"
                 }
             ],
             "regulatory": [
                 {
-                    "title": "New GST compliance requirements effective April 2024",
-                    "snippet": "E-invoicing threshold lowered to ₹5 Cr turnover. Companies must ensure GSTR-2A reconciliation with 3B within 10% threshold.",
+                    "title": f"New GST compliance requirements affecting {company_name}",
+                    "snippet": f"E-invoicing threshold lowered to ₹5 Cr turnover. {company_name} must ensure GSTR-2A reconciliation with 3B within 10% threshold.",
                     "source": "https://gst.gov.in",
                     "sentiment": "neutral"
                 }
             ],
             "mca_filing": [
                 {
-                    "title": "Annual returns filed on time with ROC",
-                    "snippet": "All statutory filings including AOC-4, MGT-7 are up to date with the Ministry of Corporate Affairs.",
+                    "title": f"{company_name} annual returns filed on time with ROC",
+                    "snippet": f"All statutory filings for {company_name} including AOC-4, MGT-7 are up to date with the Ministry of Corporate Affairs.",
                     "source": "https://mca.gov.in",
                     "sentiment": "positive"
                 }
