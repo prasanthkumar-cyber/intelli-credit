@@ -211,9 +211,9 @@ async function loadCompany() {
     currentEntityId = id;
     showLoading('Loading company data...');
 
-    // BUG 1 FIX: 10-second timeout so spinner never hangs forever
+    // BUG 1 FIX (Updated): 15-second timeout so spinner never hangs forever
     const loadController = new AbortController();
-    const loadTimeout = setTimeout(() => loadController.abort(), 10000);
+    const loadTimeout = setTimeout(() => loadController.abort(), 15000);
 
     try {
         // PERFORMANCE BOOST: Fetch lightweight summary first for instant UI
@@ -251,7 +251,7 @@ async function loadCompany() {
         clearTimeout(loadTimeout);
         hideLoading();
         const msg = e.name === 'AbortError'
-            ? 'Request timed out — server may be busy. Please try again.'
+            ? 'Timed out'
             : 'Failed to load: ' + e.message;
         showToast(msg, 'error');
     } finally {
